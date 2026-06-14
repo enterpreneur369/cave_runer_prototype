@@ -1,5 +1,11 @@
 extends CharacterBody2D
 
+enum MovementState {
+	IDLE,
+	RUN,
+	UP_STAIRS
+}
+
 @export var move_speed: float = 90.0
 @export var gravity: float = 750.0
 @export var climb_speed: float = 70.0
@@ -13,6 +19,8 @@ extends CharacterBody2D
 @onready var collision_shape: CollisionShape2D = $CollisionShape2D
 @onready var tile_map_layer: TileMapLayer = get_parent().get_node("TileMapLayer")
 
+var current_state: MovementState = MovementState.IDLE
+
 func _ready() -> void:
 	_align_sprite_with_collider()
 
@@ -20,32 +28,57 @@ func _physics_process(delta: float) -> void:
 	var input_x := Input.get_axis("ui_left", "ui_right")
 	var input_y := Input.get_axis("ui_up", "ui_down")
 	var on_ladder := _is_on_ladder()
+	var at_ladder_top := _is_at_ladder_top()
 
-	velocity.x = input_x * move_speed
+	_update_state(input_x, input_y, on_ladder, at_ladder_top)
+	_apply_state_movement(delta, input_x, input_y, at_ladder_top)
 
-	if on_ladder:
-		var climb_input_y := input_y
-		if input_x != 0.0 and input_y >= 0.0 and _is_at_ladder_top():
-			climb_input_y = -ladder_top_assist_factor
-		velocity.y = climb_input_y * climb_speed
-	else:
-		velocity.y += gravity * delta
+	if input_x != 0.0:
+		animated_sprite.flip_h = input_x < 0.0
 
 	move_and_slide()
+	_apply_state_animation()
 
-	_update_animation(Vector2(input_x, input_y))
-
-func _update_animation(input_vector: Vector2) -> void:
-	if input_vector.x != 0.0:
-		animated_sprite.flip_h = input_vector.x < 0.0
-
-	if input_vector.length() > 0.01:
-		if animated_sprite.sprite_frames.has_animation("Run"):
-			animated_sprite.play("Run")
-		else:
-			animated_sprite.play("Idle")
+func _update_state(input_x: float, input_y: float, on_ladder: bool, at_ladder_top: bool) -> void:
+	if on_ladder and (absf(input_y) > 0.01 or (input_x != 0.0 and at_ladder_top and input_y >= 0.0)):
+		current_state = MovementState.UP_STAIRS
+	elif absf(input_x) > 0.01:
+		current_state = MovementState.RUN
 	else:
-		animated_sprite.play("Idle")
+		current_state = MovementState.IDLE
+
+func _apply_state_movement(delta: float, input_x: float, input_y: float, at_ladder_top: bool) -> void:
+	velocity.x = input_x * move_speed
+
+	match current_state:
+		MovementState.UP_STAIRS:
+			var climb_input_y := input_y
+			if input_x != 0.0 and input_y >= 0.0 and at_ladder_top:
+				climb_input_y = -ladder_top_assist_factor
+			velocity.y = climb_input_y * climb_speed
+		MovementState.IDLE, MovementState.RUN:
+			velocity.y += gravity * delta
+
+func _apply_state_animation() -> void:
+	match current_state:
+		MovementState.UP_STAIRS:
+			if animated_sprite.sprite_frames.has_animation("UpStairs"):
+				_play_animation_if_needed("UpStairs")
+			elif animated_sprite.sprite_frames.has_animation("Run"):
+				_play_animation_if_needed("Run")
+			else:
+				_play_animation_if_needed("Idle")
+		MovementState.RUN:
+			if animated_sprite.sprite_frames.has_animation("Run"):
+				_play_animation_if_needed("Run")
+			else:
+				_play_animation_if_needed("Idle")
+		MovementState.IDLE:
+			_play_animation_if_needed("Idle")
+
+func _play_animation_if_needed(animation_name: StringName) -> void:
+	if animated_sprite.animation != animation_name:
+		animated_sprite.play(animation_name)
 
 func _is_on_ladder() -> bool:
 	var sample_offsets := [Vector2(0, -6), Vector2.ZERO, Vector2(0, 6)]
