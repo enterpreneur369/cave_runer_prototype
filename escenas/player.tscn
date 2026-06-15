@@ -198,15 +198,14 @@ animations = [{
 radius = 5.0249376
 
 [node name="Player" type="CharacterBody2D" unique_id=68501110]
+collision_layer = 2
 script = ExtResource("1_kkt6c")
 
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="." unique_id=1683134923]
 position = Vector2(1, 0)
 sprite_frames = SubResource("SpriteFrames_t3yu4")
-animation = &"Climb"
+animation = &"Idle"
 autoplay = "Idle"
-frame = 1
-frame_progress = 0.6784602
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=200529483]
 position = Vector2(0, 7)
